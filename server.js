@@ -1,31 +1,35 @@
-const Koa=require('koa');
-const Router=require('koa-router');
-const static=require('./routers/static');
-const body=require('koa-better-body');
-const path=require('path');
-const session=require('koa-session');
-const fs=require('fs');
-const ejs=require('koa-ejs');
-const config=require('./config');
+const Koa = require('koa');
+const Router = require('koa-router');
+const static = require('./routers/static');
+const body = require('koa-better-body');
+const path = require('path');
+const session = require('koa-session');
+const fs = require('fs');
+const ejs = require('koa-ejs');
+const config = require('./config');
 
-let server=new Koa();
-server.listen(config.PORT);
-console.log(`server running at ${config.PORT}`);
+let server = new Koa();
+
+server.listen(config.PORT, () => {
+  console.log(`server started at ${config.PORT}`)
+});
+
+require('./socket')(config); //引入websocket模块
 
 //中间件
 server.use(body({
   uploadDir: config.UPLOAD_DIR
 }));
 
-server.keys=fs.readFileSync('.keys').toString().split('\n');
+server.keys = fs.readFileSync('.keys').toString().split('\n');
 server.use(session({
-  maxAge: 20*60*1000,
+  maxAge: 20 * 60 * 1000,
   renew: true
 }, server));
 
 //数据库
-server.context.db=require('./libs/database');
-server.context.config=config;
+server.context.db = require('./libs/database');
+server.context.config = config;
 
 //渲染
 ejs(server, {
@@ -36,18 +40,20 @@ ejs(server, {
   debug: false
 });
 
-server.use(async (ctx, next)=>{
-  let {HTTP_ROOT}=ctx.config;
+server.use(async (ctx, next) => {
+  let {
+    HTTP_ROOT
+  } = ctx.config;
 
-  try{
+  try {
     await next();
 
-    if(!ctx.body){
+    if (!ctx.body) {
       await ctx.render('www/404', {
         HTTP_ROOT
       });
     }
-  }catch(e){
+  } catch (e) {
     await ctx.render('www/404', {
       HTTP_ROOT
     });
@@ -55,19 +61,18 @@ server.use(async (ctx, next)=>{
 });
 
 //路由和static
-let router=new Router();
+let router = new Router();
 
 //统一处理
-router.use(async (ctx, next)=>{
-  try{
+router.use(async (ctx, next) => {
+  try {
     await next();
-  }catch(e){
+  } catch (e) {
     ctx.throw(500, 'Internal Server Error');
 
     console.log(e);
   }
 });
-
 
 // router.use('/admin', require('./routers/admin'));
 router.use('/api', require('./routers/api'));
